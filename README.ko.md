@@ -89,12 +89,30 @@ npm install -g limelink-mcp-server
 
 ## 설정
 
-### 설정 파일 위치
+### Claude Code
+
+`claude mcp add` 명령어로 간편하게 추가할 수 있습니다:
+
+```bash
+# API 키 없이 (문서 & 가이드만)
+claude mcp add --scope user --transport stdio limelink -- npx -y limelink-mcp-server
+
+# API 키 포함 (전체 기능)
+claude mcp add --scope user --transport stdio limelink \
+  --env LIMELINK_API_KEY=your_api_key_here \
+  -- npx -y limelink-mcp-server
+```
+
+**스코프 옵션:**
+- `--scope user` — 모든 프로젝트에서 사용 가능
+- `--scope project` — `.mcp.json`에 저장 (Git으로 팀과 공유 가능)
+
+### Claude Desktop 및 기타 MCP 클라이언트
+
+클라이언트 설정 파일에 JSON 설정을 추가하세요:
 
 | 클라이언트 | 설정 파일 |
 |-----------|----------|
-| Claude Code (글로벌) | `~/.claude/settings.json` |
-| Claude Code (프로젝트) | `.claude/settings.local.json` |
 | Claude Desktop (macOS) | `~/Library/Application Support/Claude/claude_desktop_config.json` |
 | Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
 

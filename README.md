@@ -89,12 +89,30 @@ npm install -g limelink-mcp-server
 
 ## Configuration
 
-### Where to add the config
+### Claude Code
+
+The easiest way to add the MCP server is using the `claude mcp add` command:
+
+```bash
+# Without API key (docs & guides only)
+claude mcp add --scope user --transport stdio limelink -- npx -y limelink-mcp-server
+
+# With API key (full features)
+claude mcp add --scope user --transport stdio limelink \
+  --env LIMELINK_API_KEY=your_api_key_here \
+  -- npx -y limelink-mcp-server
+```
+
+**Scope options:**
+- `--scope user` — Available in all projects
+- `--scope project` — Saved to `.mcp.json` (shareable with team via Git)
+
+### Claude Desktop & other MCP clients
+
+Add the JSON config to your client's config file:
 
 | Client | Config File |
 |--------|-------------|
-| Claude Code (global) | `~/.claude/settings.json` |
-| Claude Code (project) | `.claude/settings.local.json` |
 | Claude Desktop (macOS) | `~/Library/Application Support/Claude/claude_desktop_config.json` |
 | Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
 
