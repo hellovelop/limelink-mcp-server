@@ -1,6 +1,6 @@
 {
   "name": "limelink-mcp-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "MCP server for Limelink dynamic link management",
   "type": "module",
   "main": "dist/index.js",
@@ -33,7 +33,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dotdot/limelink-mcp-server"
+    "url": "https://github.com/hellovelop/limelink-mcp-server"
   },
   "engines": {
     "node": ">=18.0.0"

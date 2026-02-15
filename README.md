@@ -7,18 +7,52 @@
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for [LimeLink](https://limelink.org) dynamic link management. Create, look up, and manage dynamic links directly from Claude Code, Claude Desktop, or any MCP-compatible client.
 
+> **No API key required to get started!** Documentation, SDK setup guides, and prompt templates work without any configuration. Just connect and start exploring LimeLink features with your AI assistant.
+
 ## Features
 
-- **3 Tools** — Create dynamic links, look up by suffix, look up by URL
-- **Documentation Resources** — Access LimeLink docs (15 pages + index) directly from your AI assistant
-- **2 Prompt Templates** — Guided workflows for link creation and SDK deep linking setup
+- **Documentation Resources** — Access LimeLink docs (15 pages + index) directly from your AI assistant — **no API key needed**
+- **2 Prompt Templates** — Guided workflows for link creation and SDK deep linking setup — **no API key needed**
+- **3 Tools** — Create dynamic links, look up by suffix, look up by URL (requires API key)
 - **In-memory Caching** — 1-hour TTL cache for documentation fetches
+
+### What works without an API key?
+
+| Feature | Category | API Key | Description |
+|---------|----------|:-------:|-------------|
+| `limelink://docs/index` | Resource | Not needed | Full documentation index |
+| `limelink://docs/{slug}` | Resource | Not needed | 15 individual documentation pages |
+| `setup-deep-linking` | Prompt | Not needed | iOS/Android SDK setup guide |
+| `create-dynamic-link` | Prompt | Not needed | Link creation guide (uses `create-link` tool to execute) |
+| `create-link` | Tool | **Required** | Create dynamic links via API |
+| `get-link-by-suffix` | Tool | **Required** | Look up links by suffix |
+| `get-link-by-url` | Tool | **Required** | Look up links by URL |
 
 ## Quick Start
 
-### Usage with npx (Recommended)
+### Without API Key (Documentation & Guides)
 
-No installation required. Add to your Claude Code or Claude Desktop config:
+No API key needed. Connect and start exploring LimeLink documentation and setup guides immediately:
+
+```json
+{
+  "mcpServers": {
+    "limelink": {
+      "command": "npx",
+      "args": ["-y", "limelink-mcp-server"]
+    }
+  }
+}
+```
+
+Try asking your AI assistant:
+- "Read the LimeLink getting-started docs"
+- "How do I set up deep linking for iOS?"
+- "Show me the LimeLink SDK integration guide"
+
+### With API Key (Full Features)
+
+Add your API key to unlock link creation and management tools:
 
 ```json
 {
@@ -68,10 +102,10 @@ npm install -g limelink-mcp-server
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `LIMELINK_API_KEY` | No | — | API key for project authentication (required for API tools; documentation resources work without it) |
+| `LIMELINK_API_KEY` | No | — | API key for link management tools. Documentation resources and prompt templates work without it. |
 | `LIMELINK_PROJECT_ID` | No | — | Default project ID (used when not specified in tool calls) |
 
-> You can get your API key from the [LimeLink Dashboard](https://limelink.org/dashboard). Without an API key, only documentation resources are available.
+> You can get your API key from the [LimeLink Dashboard](https://limelink.org/dashboard). Without an API key, documentation resources, SDK setup guides, and prompt templates are fully available.
 
 ## Tools
 
@@ -165,7 +199,7 @@ Guided workflow for setting up LimeLink SDK deep linking.
 ### Setup
 
 ```bash
-git clone https://github.com/dotdot/limelink-mcp-server.git
+git clone https://github.com/hellovelop/limelink-mcp-server.git
 cd limelink-mcp-server
 pnpm install
 pnpm run build

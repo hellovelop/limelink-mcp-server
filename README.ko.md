@@ -7,18 +7,52 @@
 
 [LimeLink](https://limelink.org) 다이나믹 링크 관리를 위한 [Model Context Protocol (MCP)](https://modelcontextprotocol.io) 서버입니다. Claude Code, Claude Desktop 등 MCP 호환 클라이언트에서 다이나믹 링크를 직접 생성하고 조회할 수 있습니다.
 
+> **API 키 없이 바로 시작할 수 있습니다!** 문서 조회, SDK 설정 가이드, 프롬프트 템플릿은 별도 설정 없이 사용 가능합니다. 연결만 하면 AI 어시스턴트에서 LimeLink의 기능을 바로 탐색할 수 있습니다.
+
 ## 기능
 
-- **3개 도구** — 다이나믹 링크 생성, suffix로 조회, URL로 조회
-- **문서 리소스** — LimeLink 문서 15페이지 + 인덱스를 AI 어시스턴트에서 직접 접근
-- **2개 프롬프트 템플릿** — 링크 생성 및 SDK 딥링크 설정 가이드 워크플로우
+- **문서 리소스** — LimeLink 문서 15페이지 + 인덱스를 AI 어시스턴트에서 직접 접근 — **API 키 불필요**
+- **2개 프롬프트 템플릿** — 링크 생성 및 SDK 딥링크 설정 가이드 워크플로우 — **API 키 불필요**
+- **3개 도구** — 다이나믹 링크 생성, suffix로 조회, URL로 조회 (API 키 필요)
 - **인메모리 캐싱** — 문서 fetch에 1시간 TTL 캐시 적용
+
+### API 키 없이 사용 가능한 기능
+
+| 기능 | 카테고리 | API 키 | 설명 |
+|------|---------|:------:|------|
+| `limelink://docs/index` | Resource | 불필요 | 전체 문서 인덱스 |
+| `limelink://docs/{slug}` | Resource | 불필요 | 15개 개별 문서 페이지 |
+| `setup-deep-linking` | Prompt | 불필요 | iOS/Android SDK 설정 가이드 |
+| `create-dynamic-link` | Prompt | 불필요 | 링크 생성 가이드 (실행 시 `create-link` 도구 필요) |
+| `create-link` | Tool | **필요** | API를 통한 다이나믹 링크 생성 |
+| `get-link-by-suffix` | Tool | **필요** | suffix로 링크 조회 |
+| `get-link-by-url` | Tool | **필요** | URL로 링크 조회 |
 
 ## 빠른 시작
 
-### npx로 사용 (권장)
+### API 키 없이 사용 (문서 & 가이드)
 
-설치 없이 바로 사용할 수 있습니다. Claude Code 또는 Claude Desktop 설정에 추가하세요:
+API 키 없이 바로 연결하여 LimeLink 문서와 설정 가이드를 탐색할 수 있습니다:
+
+```json
+{
+  "mcpServers": {
+    "limelink": {
+      "command": "npx",
+      "args": ["-y", "limelink-mcp-server"]
+    }
+  }
+}
+```
+
+AI 어시스턴트에게 이렇게 물어보세요:
+- "LimeLink 시작하기 문서를 읽어줘"
+- "iOS 딥링크 설정은 어떻게 해?"
+- "LimeLink SDK 연동 가이드를 보여줘"
+
+### API 키로 사용 (전체 기능)
+
+API 키를 추가하면 링크 생성 및 관리 도구를 사용할 수 있습니다:
 
 ```json
 {
@@ -68,10 +102,10 @@ npm install -g limelink-mcp-server
 
 | 변수 | 필수 | 기본값 | 설명 |
 |------|------|--------|------|
-| `LIMELINK_API_KEY` | N | — | 프로젝트 인증용 API 키 (API 도구 사용 시 필수, 문서 리소스는 키 없이 이용 가능) |
+| `LIMELINK_API_KEY` | N | — | 링크 관리 도구용 API 키. 문서 리소스와 프롬프트 템플릿은 키 없이 사용 가능합니다. |
 | `LIMELINK_PROJECT_ID` | N | — | 기본 프로젝트 ID (도구 호출 시 미지정 시 사용) |
 
-> API 키는 [LimeLink 대시보드](https://limelink.org/dashboard)에서 발급받을 수 있습니다. API 키 없이도 문서 리소스는 사용할 수 있습니다.
+> API 키는 [LimeLink 대시보드](https://limelink.org/dashboard)에서 발급받을 수 있습니다. API 키 없이도 문서 리소스, SDK 설정 가이드, 프롬프트 템플릿을 모두 사용할 수 있습니다.
 
 ## 도구 (Tools)
 
@@ -165,7 +199,7 @@ LimeLink SDK 딥링크 설정을 위한 가이드 워크플로우입니다.
 ### 설치
 
 ```bash
-git clone https://github.com/dotdot/limelink-mcp-server.git
+git clone https://github.com/hellovelop/limelink-mcp-server.git
 cd limelink-mcp-server
 pnpm install
 pnpm run build
