@@ -1,0 +1,51 @@
+{
+  "name": "limelink-mcp-server",
+  "version": "0.0.1",
+  "description": "MCP server for Limelink dynamic link management",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "limelink-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "pnpm run build",
+    "test": "vitest run",
+    "test:unit": "vitest run -c vitest.config.ts",
+    "test:e2e": "vitest run -c vitest.config.e2e.ts",
+    "test:watch": "vitest -c vitest.config.ts",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "limelink",
+    "dynamic-link",
+    "deep-link",
+    "claude",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dotdot/limelink-mcp-server"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "3.2.4",
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
+  }
+}
