@@ -1,6 +1,7 @@
 {
   "name": "limelink-mcp-server",
-  "version": "0.0.3",
+  "version": "0.0.4",
+  "mcpName": "io.github.hellovelop/limelink-mcp-server",
   "description": "MCP server for Limelink dynamic link management",
   "type": "module",
   "main": "dist/index.js",
