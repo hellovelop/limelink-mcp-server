@@ -1,4 +1,4 @@
 {
-  "name": "limelink-mcp-server",
-  "description": "MCP server for Limelink dynamic links with deep linking, social previews, and UTM tracking"
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": ["dotdotgod"]
 }

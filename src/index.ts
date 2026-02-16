@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./lib/config.js";
@@ -9,8 +10,7 @@ import { registerTools } from "./tools/index.js";
 import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
 
-const require = createRequire(import.meta.url);
-const { version } = require("../package.json");
+const { version } = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf-8"));
 
 function createMcpServer(): McpServer {
   return new McpServer({ name: "limelink", version });
