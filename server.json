@@ -6,12 +6,12 @@
     "url": "https://github.com/hellovelop/limelink-mcp-server",
     "source": "github"
   },
-  "version": "0.0.4",
+  "version": "0.0.5",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "limelink-mcp-server",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "transport": {
         "type": "stdio"
       },

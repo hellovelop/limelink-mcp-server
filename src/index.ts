@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./lib/config.js";
@@ -8,15 +9,29 @@ import { registerTools } from "./tools/index.js";
 import { registerResources } from "./resources/index.js";
 import { registerPrompts } from "./prompts/index.js";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
+
+function createMcpServer(): McpServer {
+  return new McpServer({ name: "limelink", version });
+}
+
+export function createSandboxServer(): McpServer {
+  const server = createMcpServer();
+
+  registerTools(server, null, {});
+  registerResources(server, new DocFetcher());
+  registerPrompts(server);
+
+  return server;
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const apiClient = config.apiKey ? new ApiClient(config.apiKey) : null;
   const docFetcher = new DocFetcher();
 
-  const server = new McpServer({
-    name: "limelink",
-    version: "1.0.0",
-  });
+  const server = createMcpServer();
 
   registerTools(server, apiClient, config);
   registerResources(server, docFetcher);
