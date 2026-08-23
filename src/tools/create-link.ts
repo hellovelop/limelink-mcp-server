@@ -1,151 +1,132 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ApiClient } from "../lib/api-client.js";
-import type { Config } from "../lib/config.js";
+import type { ProfileRegistry } from "../lib/profile-registry.js";
+import { profileInput, toolError } from "./common.js";
 
-const API_KEY_REQUIRED_ERROR = {
-  content: [
-    {
-      type: "text" as const,
-      text: "Error: LIMELINK_API_KEY is not configured. Set the LIMELINK_API_KEY environment variable to use this tool.",
-    },
-  ],
-  isError: true,
-};
+const nullableString = (max: number) => z.string().max(max).nullable().optional();
+const nullableBoolean = z.boolean().nullable().optional();
+
+const notInstalledOptions = z
+  .object({
+    not_installed_options_action: nullableString(100),
+    custom_url: nullableString(500),
+  })
+  .strict();
+
+const appleAdvancedOptions = z
+  .object({
+    ipad_option: nullableBoolean,
+    app_store_campaign_option: nullableBoolean,
+    basic_custom_url_option: nullableBoolean,
+    ipad_store_id: nullableString(100),
+    ipad_scheme: nullableString(50),
+    at: nullableString(500),
+    ct: nullableString(500),
+    pt: nullableString(500),
+    mt: nullableString(500),
+    ius: nullableString(100),
+  })
+  .strict();
+
+const androidAdvancedOptions = z
+  .object({
+    advanced_option: nullableBoolean,
+    version: nullableString(50),
+  })
+  .strict();
+
+const appleApplicationInfo = z
+  .object({
+    app_id: nullableString(100),
+    app_store_id: nullableString(100),
+    app_scheme: nullableString(50),
+    app_name: nullableString(200),
+  })
+  .strict();
+
+const androidApplicationInfo = z
+  .object({
+    app_package_name: nullableString(200),
+    app_scheme: nullableString(50),
+    app_name: nullableString(200),
+    sha256_fingerprint: nullableString(500),
+  })
+  .strict();
 
 const inputSchema = {
-  dynamic_link_suffix: z
+  profile: profileInput,
+  project: z
     .string()
-    .max(50)
-    .describe("Unique identifier for the short URL path"),
-  dynamic_link_url: z
-    .string()
-    .url()
-    .max(500)
-    .describe("Target URL for desktop or fallback"),
-  dynamic_link_name: z
-    .string()
+    .min(1)
     .max(100)
-    .describe("Link name for management and identification"),
-  project_id: z
-    .string()
-    .optional()
-    .describe(
-      "Project ID the link belongs to. Uses LIMELINK_PROJECT_ID env if not provided."
-    ),
-  stats_flag: z.boolean().optional().describe("Enable analytics tracking"),
+    .describe("Configured Project alias or Project UUID"),
+  dynamic_link_url: z.string().url().max(500),
+  dynamic_link_name: z.string().max(100),
+  dynamic_link_suffix: z.string().min(1).max(100).optional(),
+  custom_domain_id: z.string().uuid().nullable().optional(),
+  stats_flag: z.boolean().optional(),
   apple_options: z
     .object({
-      application_id: z
-        .string()
-        .max(100)
-        .describe("iOS application ID registered in the dashboard"),
-      request_uri: z.string().optional().describe("Deep link path inside the app"),
-      not_installed_options: z
-        .object({
-          custom_url: z
-            .string()
-            .max(500)
-            .describe("Redirect URL when the app is not installed"),
-        })
-        .optional(),
+      apple_action: nullableString(100),
+      application_id: nullableString(100),
+      request_uri: z.string().nullable().optional(),
+      application_info: appleApplicationInfo.nullable().optional(),
+      not_installed_options: notInstalledOptions.nullable().optional(),
+      apple_advanced_options: appleAdvancedOptions.nullable().optional(),
     })
-    .optional()
-    .describe("iOS-specific deep linking options"),
+    .strict()
+    .nullable()
+    .optional(),
   android_options: z
     .object({
-      application_id: z
-        .string()
-        .max(100)
-        .describe("Android application ID registered in the dashboard"),
-      request_uri: z.string().optional().describe("Deep link path inside the app"),
-      not_installed_options: z
-        .object({
-          custom_url: z
-            .string()
-            .max(500)
-            .describe("Redirect URL when the app is not installed"),
-        })
-        .optional(),
+      android_action: nullableString(100),
+      application_id: nullableString(100),
+      request_uri: z.string().nullable().optional(),
+      application_info: androidApplicationInfo.nullable().optional(),
+      not_installed_options: notInstalledOptions.nullable().optional(),
+      android_advanced_options: androidAdvancedOptions.nullable().optional(),
     })
-    .optional()
-    .describe("Android-specific deep linking options"),
+    .strict()
+    .nullable()
+    .optional(),
   additional_options: z
     .object({
-      preview_title: z.string().max(100).describe("Social preview title"),
-      preview_description: z
-        .string()
-        .max(200)
-        .describe("Social preview description"),
-      preview_image_url: z
-        .string()
-        .max(500)
-        .describe("Social preview image URL"),
-      utm_source: z.string().optional().describe("UTM source parameter"),
-      utm_medium: z.string().optional().describe("UTM medium parameter"),
-      utm_campaign: z.string().optional().describe("UTM campaign parameter"),
+      preview_action: nullableBoolean,
+      utm_action: nullableBoolean,
+      preview_title: nullableString(100),
+      preview_description: nullableString(200),
+      preview_image_url: z.string().url().max(500).nullable().optional(),
+      utm_source: nullableString(500),
+      utm_medium: nullableString(200),
+      utm_campaign: nullableString(500),
+      skip_app_preview: nullableBoolean,
     })
-    .optional()
-    .describe("Social preview and UTM tracking options"),
+    .strict()
+    .nullable()
+    .optional(),
 };
 
-export function registerCreateLink(
-  server: McpServer,
-  apiClient: ApiClient | null,
-  config: Config
-): void {
+export function registerCreateLink(server: McpServer, registry: ProfileRegistry): void {
   server.tool(
     "create-link",
-    "Create a Limelink dynamic link with platform-specific deep linking, social previews, and UTM tracking",
+    "Create a LimeLink V2 Core Link",
     inputSchema,
     async (params) => {
-      if (!apiClient) return API_KEY_REQUIRED_ERROR;
-
-      const projectId = params.project_id || config.projectId;
-      if (!projectId) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "Error: project_id is required. Provide it as a parameter or set LIMELINK_PROJECT_ID environment variable.",
-            },
-          ],
-          isError: true,
-        };
-      }
-
       try {
-        const body: Record<string, unknown> = {
-          dynamic_link_suffix: params.dynamic_link_suffix,
-          dynamic_link_url: params.dynamic_link_url,
-          dynamic_link_name: params.dynamic_link_name,
+        const selected = await registry.initialize(params.profile, "links:write");
+        const projectId = registry.resolveProject(selected.alias, params.project);
+        const { profile: _profile, project: _project, ...options } = params;
+        const result = await selected.client.createLink({
+          ...options,
           project_id: projectId,
-        };
-
-        if (params.stats_flag !== undefined) body.stats_flag = params.stats_flag;
-        if (params.apple_options) body.apple_options = params.apple_options;
-        if (params.android_options) body.android_options = params.android_options;
-        if (params.additional_options)
-          body.additional_options = params.additional_options;
-
-        const result = await apiClient.createLink(body);
+        });
         return {
           content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(result, null, 2),
-            },
+            { type: "text" as const, text: JSON.stringify(result, null, 2) },
           ],
         };
       } catch (error) {
-        const message =
-          error && typeof error === "object" && "message" in error
-            ? (error as { message: string }).message
-            : String(error);
-        return {
-          content: [{ type: "text" as const, text: `Error creating link: ${message}` }],
-          isError: true,
-        };
+        return toolError("Error creating link: ", error);
       }
     }
   );

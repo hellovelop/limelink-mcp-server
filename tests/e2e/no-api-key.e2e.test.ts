@@ -21,7 +21,7 @@ describe("E2E: API 키 없이 서버 기동", () => {
 
   it("API 키 없이도 도구 목록을 조회할 수 있다", async () => {
     const { tools } = await server.client.listTools();
-    expect(tools).toHaveLength(3);
+    expect(tools).toHaveLength(6);
   });
 
   it("API 키 없이도 리소스 목록을 조회할 수 있다", async () => {
@@ -29,51 +29,45 @@ describe("E2E: API 키 없이 서버 기동", () => {
     expect(resources.length).toBeGreaterThan(0);
   });
 
-  it("API 키 없이도 프롬프트 목록을 조회할 수 있다", async () => {
-    const { prompts } = await server.client.listPrompts();
-    expect(prompts).toHaveLength(2);
+  it("프롬프트 기능을 노출하지 않는다", async () => {
+    await expect(server.client.listPrompts()).rejects.toThrow("Method not found");
   });
 
   describe("API 키 없이 Tool 호출 시 에러", () => {
-    it("create-link 호출 시 API 키 필요 에러를 반환한다", async () => {
+    const expectCredentialGuide = (result: Awaited<ReturnType<typeof server.client.callTool>>) => {
+      expect(result.isError).toBe(true);
+      const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+      expect(text).toContain("https://limelink.org/organizations");
+      expect(text).toContain("Organization API key");
+      expect(text).toContain("LIMELINK_PROFILES_FILE");
+    };
+
+    it("create-link 호출 시 API key 발급 경로를 안내한다", async () => {
       const result = await server.client.callTool({
         name: "create-link",
         arguments: {
-          dynamic_link_suffix: "test",
           dynamic_link_url: "https://example.com",
           dynamic_link_name: "Test",
+          project: "11111111-1111-4111-8111-111111111111",
         },
       });
-
-      expect(result.isError).toBe(true);
-      const text = (result.content as Array<{ type: string; text: string }>)[0].text;
-      expect(text).toContain("LIMELINK_API_KEY");
+      expectCredentialGuide(result);
     });
 
-    it("get-link-by-suffix 호출 시 API 키 필요 에러를 반환한다", async () => {
+    it("get-link-by-suffix 호출 시 API key 발급 경로를 안내한다", async () => {
       const result = await server.client.callTool({
         name: "get-link-by-suffix",
-        arguments: {
-          suffix: "test",
-        },
+        arguments: { suffix: "test", project: "11111111-1111-4111-8111-111111111111" },
       });
-
-      expect(result.isError).toBe(true);
-      const text = (result.content as Array<{ type: string; text: string }>)[0].text;
-      expect(text).toContain("LIMELINK_API_KEY");
+      expectCredentialGuide(result);
     });
 
-    it("get-link-by-url 호출 시 API 키 필요 에러를 반환한다", async () => {
+    it("get-link-by-url 호출 시 API key 발급 경로를 안내한다", async () => {
       const result = await server.client.callTool({
         name: "get-link-by-url",
-        arguments: {
-          url: "https://deep.limelink.org/test",
-        },
+        arguments: { url: "https://deep.limelink.org/test" },
       });
-
-      expect(result.isError).toBe(true);
-      const text = (result.content as Array<{ type: string; text: string }>)[0].text;
-      expect(text).toContain("LIMELINK_API_KEY");
+      expectCredentialGuide(result);
     });
   });
 });

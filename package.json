@@ -1,18 +1,22 @@
 {
-  "name": "limelink-mcp-server",
-  "version": "0.0.5",
+  "name": "@limelink/mcp",
+  "version": "0.1.0",
   "mcpName": "io.github.hellovelop/limelink-mcp-server",
   "description": "MCP server for Limelink dynamic link management",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "limelink-mcp-server": "dist/index.js"
+    "limelink-mcp": "dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm run clean && tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "prepublishOnly": "pnpm run build",

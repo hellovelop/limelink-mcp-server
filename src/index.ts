@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./lib/config.js";
-import { ApiClient } from "./lib/api-client.js";
+import { ProfileRegistry } from "./lib/profile-registry.js";
 import { DocFetcher } from "./lib/doc-fetcher.js";
 import { registerTools } from "./tools/index.js";
 import { registerResources } from "./resources/index.js";
-import { registerPrompts } from "./prompts/index.js";
 
-const { version } = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf-8"));
+const packageJsonUrl = new URL("../package.json", import.meta.url);
+const { version } = JSON.parse(readFileSync(packageJsonUrl, "utf-8"));
 
 function createMcpServer(): McpServer {
   return new McpServer({ name: "limelink", version });
@@ -19,23 +18,21 @@ function createMcpServer(): McpServer {
 export function createSandboxServer(): McpServer {
   const server = createMcpServer();
 
-  registerTools(server, null, {});
+  registerTools(server, new ProfileRegistry({ version: 1, profiles: new Map() }));
   registerResources(server, new DocFetcher());
-  registerPrompts(server);
 
   return server;
 }
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const apiClient = config.apiKey ? new ApiClient(config.apiKey) : null;
+  const registry = new ProfileRegistry(config);
   const docFetcher = new DocFetcher();
 
   const server = createMcpServer();
 
-  registerTools(server, apiClient, config);
+  registerTools(server, registry);
   registerResources(server, docFetcher);
-  registerPrompts(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

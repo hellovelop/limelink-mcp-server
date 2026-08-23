@@ -1,31 +1,24 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.hellovelop/limelink-mcp-server",
-  "description": "MCP server for Limelink dynamic links with deep linking, social previews, and UTM tracking",
+  "description": "MCP server for LimeLink V2 Core Links, Organization profiles, Project aliases, Custom Domains, deep linking, previews, and UTM tracking",
   "repository": {
     "url": "https://github.com/hellovelop/limelink-mcp-server",
     "source": "github"
   },
-  "version": "0.0.5",
+  "version": "0.1.0",
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "limelink-mcp-server",
-      "version": "0.0.5",
+      "identifier": "@limelink/mcp",
+      "version": "0.1.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
-          "name": "LIMELINK_API_KEY",
-          "description": "Your Limelink API key for authentication",
-          "isRequired": false,
-          "format": "string",
-          "isSecret": true
-        },
-        {
-          "name": "LIMELINK_PROJECT_ID",
-          "description": "Default Limelink project ID (can be overridden per request)",
+          "name": "LIMELINK_PROFILES_FILE",
+          "description": "Path to the versioned LimeLink profiles JSON file",
           "isRequired": false,
           "format": "string",
           "isSecret": false

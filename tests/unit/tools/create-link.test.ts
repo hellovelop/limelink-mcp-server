@@ -1,221 +1,86 @@
 import { describe, it, expect } from "vitest";
 import { registerCreateLink } from "../../../src/tools/create-link.js";
-import {
-  createMockMcpServer,
-  createMockApiClient,
-  createMockConfig,
-  createMockConfigWithoutProjectId,
-  createMockConfigWithoutApiKey,
-  extractToolHandler,
-} from "../../mocks/server.js";
+import { createMockMcpServer, createMockRegistry, extractToolHandler } from "../../mocks/server.js";
 
-describe("registerCreateLink (tool handler)", () => {
-  const minimalParams = {
-    dynamic_link_suffix: "test-link",
-    dynamic_link_url: "https://example.com",
-    dynamic_link_name: "Test Link",
-  };
+const project = "11111111-1111-4111-8111-111111111111";
+const params = { dynamic_link_url: "https://example.com", dynamic_link_name: "X", project };
 
-  function setup(configOverrides = {}) {
-    const server = createMockMcpServer();
-    const apiClient = createMockApiClient();
-    const config = createMockConfig(configOverrides);
-    registerCreateLink(server as any, apiClient as any, config);
-    return { server, apiClient, config, handler: extractToolHandler(server) };
-  }
-
-  it("tool을 올바른 이름과 설명으로 등록한다", () => {
-    const { server } = setup();
-    expect(server.tool).toHaveBeenCalledWith(
-      "create-link",
-      expect.any(String),
-      expect.any(Object),
-      expect.any(Function)
-    );
+describe("create-link V2 profiles", () => {
+  it("initializes selected profile and resolves direct Project UUID", async () => {
+    const s = createMockMcpServer();
+    const { registry, apiClient } = createMockRegistry();
+    apiClient.createLink.mockResolvedValue({ id: "1" });
+    registerCreateLink(s as any, registry);
+    const result = await extractToolHandler(s)(params);
+    expect(apiClient.getCurrentCredential).toHaveBeenCalledOnce();
+    expect(apiClient.createLink).toHaveBeenCalledWith(expect.objectContaining({ project_id: project }));
+    expect(result.isError).toBeUndefined();
   });
 
-  describe("API 키 누락", () => {
-    it("apiClient가 null이면 API 키 필요 에러를 반환한다", async () => {
-      const server = createMockMcpServer();
-      const config = createMockConfigWithoutApiKey();
-      registerCreateLink(server as any, null, config);
-      const handler = extractToolHandler(server);
-
-      const result = (await handler(minimalParams)) as any;
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("LIMELINK_API_KEY");
-    });
-
-    it("apiClient가 null이면 API 호출을 시도하지 않는다", async () => {
-      const server = createMockMcpServer();
-      const apiClient = createMockApiClient();
-      const config = createMockConfigWithoutApiKey();
-      registerCreateLink(server as any, null, config);
-      const handler = extractToolHandler(server);
-
-      await handler(minimalParams);
-
-      expect(apiClient.createLink).not.toHaveBeenCalled();
-    });
+  it("resolves configured Project alias", async () => {
+    const s = createMockMcpServer();
+    const profiles: any = { test: { apiKey: "test-key", organizationLabel: "Test", projects: new Map([["marketing", project]]) } };
+    const { registry, apiClient } = createMockRegistry(undefined, profiles);
+    apiClient.createLink.mockResolvedValue({});
+    registerCreateLink(s as any, registry);
+    await extractToolHandler(s)({ ...params, project: "marketing" });
+    expect(apiClient.createLink).toHaveBeenCalledWith(expect.objectContaining({ project_id: project }));
   });
 
-  describe("project_id 해석", () => {
-    it("파라미터의 project_id를 우선 사용한다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockResolvedValue({ id: "1" });
-
-      await handler({
-        ...minimalParams,
-        project_id: "param-proj",
-      });
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body.project_id).toBe("param-proj");
-    });
-
-    it("파라미터에 없으면 config.projectId를 사용한다", async () => {
-      const { handler, apiClient } = setup({ projectId: "config-proj" });
-      apiClient.createLink.mockResolvedValue({ id: "1" });
-
-      await handler(minimalParams);
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body.project_id).toBe("config-proj");
-    });
-
-    it("둘 다 없으면 에러를 반환한다", async () => {
-      const server = createMockMcpServer();
-      const apiClient = createMockApiClient();
-      const config = createMockConfigWithoutProjectId();
-      registerCreateLink(server as any, apiClient as any, config);
-      const handler = extractToolHandler(server);
-
-      const result = (await handler(minimalParams)) as any;
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("project_id is required");
-      expect(apiClient.createLink).not.toHaveBeenCalled();
-    });
+  it("requires project and allows omitted suffix", () => {
+    const s = createMockMcpServer();
+    const { registry } = createMockRegistry();
+    registerCreateLink(s as any, registry);
+    const schema = s.tool.mock.calls[0][2];
+    expect(() => schema.project.parse(undefined)).toThrow();
+    expect(schema.dynamic_link_suffix.parse(undefined)).toBeUndefined();
+    expect(schema.dynamic_link_suffix.parse("x".repeat(100))).toHaveLength(100);
   });
 
-  describe("요청 바디 구성", () => {
-    it("필수 필드를 항상 포함한다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockResolvedValue({});
-
-      await handler(minimalParams);
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body).toEqual(
-        expect.objectContaining({
-          dynamic_link_suffix: "test-link",
-          dynamic_link_url: "https://example.com",
-          dynamic_link_name: "Test Link",
-          project_id: "test-project-id",
-        })
-      );
-    });
-
-    it("stats_flag가 제공되면 포함한다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockResolvedValue({});
-
-      await handler({ ...minimalParams, stats_flag: true });
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body.stats_flag).toBe(true);
-    });
-
-    it("stats_flag가 false여도 포함한다 (undefined 아님)", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockResolvedValue({});
-
-      await handler({ ...minimalParams, stats_flag: false });
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body.stats_flag).toBe(false);
-    });
-
-    it("stats_flag가 undefined이면 바디에 포함하지 않는다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockResolvedValue({});
-
-      await handler(minimalParams);
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body).not.toHaveProperty("stats_flag");
-    });
-
-    it("apple_options가 제공되면 포함한다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockResolvedValue({});
-
-      const appleOptions = {
-        application_id: "app-1",
-        request_uri: "product/123",
-      };
-      await handler({ ...minimalParams, apple_options: appleOptions });
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body.apple_options).toEqual(appleOptions);
-    });
-
-    it("android_options, additional_options가 제공되면 포함한다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockResolvedValue({});
-
-      const params = {
-        ...minimalParams,
-        android_options: { application_id: "android-app" },
-        additional_options: {
-          preview_title: "Title",
-          preview_description: "Desc",
-          preview_image_url: "https://img.com/a.png",
-        },
-      };
-      await handler(params);
-
-      const body = apiClient.createLink.mock.calls[0][0];
-      expect(body.android_options).toEqual({ application_id: "android-app" });
-      expect(body.additional_options.preview_title).toBe("Title");
-    });
+  it("passes official V2 custom and platform options through", async () => {
+    const s = createMockMcpServer();
+    const { registry, apiClient } = createMockRegistry();
+    apiClient.createLink.mockResolvedValue({});
+    registerCreateLink(s as any, registry);
+    const options = {
+      custom_domain_id: "44444444-4444-4444-8444-444444444444",
+      apple_options: {
+        application_id: null,
+        application_info: { app_id: "com.example.app" },
+        not_installed_options: { custom_url: "https://example.com/install" },
+        apple_advanced_options: { ipad_option: true },
+      },
+      android_options: { android_advanced_options: { version: "1" } },
+      additional_options: { skip_app_preview: true },
+    };
+    await extractToolHandler(s)({ ...params, ...options });
+    expect(apiClient.createLink).toHaveBeenCalledWith(expect.objectContaining(options));
   });
 
-  describe("응답 포맷", () => {
-    it("성공 시 JSON 문자열로 반환한다", async () => {
-      const { handler, apiClient } = setup();
-      const apiResult = { id: "link-1", dynamic_link_suffix: "test-link" };
-      apiClient.createLink.mockResolvedValue(apiResult);
+  it("rejects unknown official option fields", () => {
+    const s = createMockMcpServer();
+    const { registry } = createMockRegistry();
+    registerCreateLink(s as any, registry);
+    const apple = s.tool.mock.calls[0][2].apple_options.unwrap().unwrap();
+    expect(() => apple.parse({ unknown: true })).toThrow();
+  });
 
-      const result = (await handler(minimalParams)) as any;
+  it("preserves upstream JSON details and fallback HTTP status", async () => {
+    const s = createMockMcpServer();
+    const { registry, apiClient } = createMockRegistry();
+    apiClient.createLink.mockRejectedValue({ statusCode: 422, message: JSON.stringify({ message: ["invalid"], error: "Validation" }) });
+    registerCreateLink(s as any, registry);
+    const result = await extractToolHandler(s)(params);
+    expect(result.content[0].text).toContain("HTTP 422");
+    expect(result.content[0].text).toContain("Validation");
+  });
 
-      expect(result.isError).toBeUndefined();
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe("text");
-      expect(JSON.parse(result.content[0].text)).toEqual(apiResult);
-    });
-
-    it("API 에러 시 isError와 메시지를 반환한다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockRejectedValue({
-        message: "Duplicate suffix",
-      });
-
-      const result = (await handler(minimalParams)) as any;
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Duplicate suffix");
-    });
-
-    it("message가 없는 에러는 String()으로 변환한다", async () => {
-      const { handler, apiClient } = setup();
-      apiClient.createLink.mockRejectedValue("raw error string");
-
-      const result = (await handler(minimalParams)) as any;
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("raw error string");
-    });
+  it("accepts optional preview fields and rejects malformed image URLs", () => {
+    const s = createMockMcpServer();
+    const { registry } = createMockRegistry();
+    registerCreateLink(s as any, registry);
+    const additional = s.tool.mock.calls[0][2].additional_options.unwrap().unwrap();
+    expect(additional.parse({ utm_source: "source" })).toEqual({ utm_source: "source" });
+    expect(() => additional.parse({ preview_image_url: "not-a-url" })).toThrow();
   });
 });

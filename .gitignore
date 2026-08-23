@@ -6,3 +6,8 @@ coverage/
 
 .mcpregistry*
 .smithery
+
+# Local agent memory and task records
+.dotdotgod
+docs/plan
+docs/archive

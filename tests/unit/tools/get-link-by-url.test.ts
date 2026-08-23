@@ -1,194 +1,92 @@
 import { describe, it, expect } from "vitest";
-import { extractSuffix, registerGetLinkByUrl } from "../../../src/tools/get-link-by-url.js";
+import { registerGetLinkByUrl } from "../../../src/tools/get-link-by-url.js";
 import {
   createMockMcpServer,
-  createMockApiClient,
-  createMockConfig,
-  createMockConfigWithoutProjectId,
-  createMockConfigWithoutApiKey,
+  createMockRegistry,
   extractToolHandler,
 } from "../../mocks/server.js";
 
-describe("extractSuffix", () => {
-  describe("Free plan URL (deep.limelink.org)", () => {
-    it("단순 suffix를 추출한다", () => {
-      expect(extractSuffix("https://deep.limelink.org/my-link")).toBe("my-link");
+const resolvedLink = {
+  id: "66666666-6666-4666-8666-666666666666",
+  short_url: "https://go.customer.example/campaign",
+};
+
+describe("get-link-by-url", () => {
+  it("credential profile이 없으면 발급 경로를 안내한다", async () => {
+    const server = createMockMcpServer();
+    const { registry } = createMockRegistry(undefined, {}, undefined as never);
+    registerGetLinkByUrl(server as never, registry);
+
+    const result = await extractToolHandler(server)({
+      url: "https://go.customer.example/campaign",
     });
 
-    it("중첩 경로 suffix를 추출한다", () => {
-      expect(extractSuffix("https://deep.limelink.org/path/nested")).toBe(
-        "path/nested"
-      );
-    });
-
-    it("루트 경로는 null을 반환한다 (빈 suffix)", () => {
-      expect(extractSuffix("https://deep.limelink.org/")).toBeNull();
-    });
-
-    it("경로 없는 URL은 null을 반환한다", () => {
-      expect(extractSuffix("https://deep.limelink.org")).toBeNull();
-    });
-
-    it("쿼리 파라미터는 suffix에 포함하지 않는다", () => {
-      expect(extractSuffix("https://deep.limelink.org/link?ref=test")).toBe(
-        "link"
-      );
-    });
+    expect(JSON.stringify(result)).toContain("https://limelink.org/organizations");
   });
 
-  describe("Pro plan URL ({project}.limelink.org)", () => {
-    it("/link/{suffix} 패턴에서 suffix를 추출한다", () => {
-      expect(
-        extractSuffix("https://myproject.limelink.org/link/promo")
-      ).toBe("promo");
-    });
+  it.each([
+    "https://deep.limelink.org/campaign",
+    "https://project.limelink.org/campaign",
+    "https://go.customer.example/campaign",
+  ])("full URL을 V2 resolver에 그대로 전달한다: %s", async (url) => {
+    const server = createMockMcpServer();
+    const { registry, apiClient } = createMockRegistry();
+    apiClient.resolveLinkByUrl.mockResolvedValue(resolvedLink);
+    registerGetLinkByUrl(server as never, registry);
 
-    it("중첩 suffix를 추출한다", () => {
-      expect(
-        extractSuffix("https://myproject.limelink.org/link/a/b")
-      ).toBe("a/b");
-    });
+    const result = await extractToolHandler(server)({ url });
 
-    it("/link/ 뒤에 suffix가 없으면 null을 반환한다", () => {
-      expect(
-        extractSuffix("https://myproject.limelink.org/link/")
-      ).toBeNull();
-    });
-
-    it("/link 패턴이 아니면 null을 반환한다", () => {
-      expect(
-        extractSuffix("https://myproject.limelink.org/other/path")
-      ).toBeNull();
-    });
-
-    it("루트 경로는 null을 반환한다", () => {
-      expect(
-        extractSuffix("https://myproject.limelink.org/")
-      ).toBeNull();
-    });
+    expect(apiClient.resolveLinkByUrl).toHaveBeenCalledWith(url);
+    expect(apiClient.getLinkBySuffix).not.toHaveBeenCalled();
+    expect(result.isError).toBeUndefined();
+    expect(JSON.parse(result.content[0].text)).toEqual(resolvedLink);
   });
 
-  describe("잘못된 URL", () => {
-    it("limelink이 아닌 도메인은 null을 반환한다", () => {
-      expect(extractSuffix("https://example.com/link/test")).toBeNull();
+  it("links:read가 없으면 resolver를 호출하지 않는다", async () => {
+    const server = createMockMcpServer();
+    const { registry, apiClient } = createMockRegistry();
+    apiClient.getCurrentCredential.mockResolvedValue({
+      id: "77777777-7777-4777-8777-777777777777",
+      organization_id: "22222222-2222-4222-8222-222222222222",
+      key_prefix: "AbCd12",
+      scopes: ["projects:read"],
+    });
+    registerGetLinkByUrl(server as never, registry);
+
+    const result = await extractToolHandler(server)({
+      url: "https://go.customer.example/campaign",
     });
 
-    it("유효하지 않은 URL은 null을 반환한다", () => {
-      expect(extractSuffix("not-a-url")).toBeNull();
-    });
-
-    it("빈 문자열은 null을 반환한다", () => {
-      expect(extractSuffix("")).toBeNull();
-    });
-
-    it("HTTP 프로토콜도 동작한다", () => {
-      expect(extractSuffix("http://deep.limelink.org/test")).toBe("test");
-    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("links:read");
+    expect(apiClient.resolveLinkByUrl).not.toHaveBeenCalled();
   });
-});
 
-describe("registerGetLinkByUrl (tool handler)", () => {
-  describe("API 키 누락", () => {
-    it("apiClient가 null이면 API 키 필요 에러를 반환한다", async () => {
+  it.each([400, 401, 403, 404, 409])(
+    "upstream HTTP %i status와 JSON 오류를 보존한다",
+    async (status) => {
       const server = createMockMcpServer();
-      const config = createMockConfigWithoutApiKey();
-      registerGetLinkByUrl(server as any, null, config);
-      const handler = extractToolHandler(server);
+      const { registry, apiClient } = createMockRegistry();
+      const message = status === 400
+        ? ["URL must be absolute HTTPS."]
+        : status === 404
+          ? "Link not found."
+          : "Resolve failed.";
+      apiClient.resolveLinkByUrl.mockRejectedValue({
+        statusCode: status,
+        message: JSON.stringify({ statusCode: status, message, error: "ERROR" }),
+      });
+      registerGetLinkByUrl(server as never, registry);
 
-      const result = (await handler({
-        url: "https://deep.limelink.org/test",
-      })) as any;
+      const result = await extractToolHandler(server)({
+        url: "https://go.customer.example/missing",
+      });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("LIMELINK_API_KEY");
-    });
-  });
-
-  it("URL에서 suffix 추출 실패 시 에러를 반환한다", async () => {
-    const server = createMockMcpServer();
-    const apiClient = createMockApiClient();
-    const config = createMockConfig();
-
-    registerGetLinkByUrl(server as any, apiClient as any, config);
-    const handler = extractToolHandler(server);
-
-    const result = (await handler({ url: "https://example.com/test" })) as any;
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("Could not extract suffix");
-  });
-
-  it("project_id 누락 시 에러를 반환한다", async () => {
-    const server = createMockMcpServer();
-    const apiClient = createMockApiClient();
-    const config = createMockConfigWithoutProjectId();
-
-    registerGetLinkByUrl(server as any, apiClient as any, config);
-    const handler = extractToolHandler(server);
-
-    const result = (await handler({
-      url: "https://deep.limelink.org/test",
-    })) as any;
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("project_id is required");
-  });
-
-  it("성공 시 API 결과를 JSON으로 반환한다", async () => {
-    const server = createMockMcpServer();
-    const apiClient = createMockApiClient();
-    const config = createMockConfig();
-
-    apiClient.getLinkBySuffix.mockResolvedValue({ id: "link-1" });
-
-    registerGetLinkByUrl(server as any, apiClient as any, config);
-    const handler = extractToolHandler(server);
-
-    const result = (await handler({
-      url: "https://deep.limelink.org/my-link",
-    })) as any;
-
-    expect(result.isError).toBeUndefined();
-    expect(apiClient.getLinkBySuffix).toHaveBeenCalledWith(
-      "test-project-id",
-      "my-link"
-    );
-    expect(JSON.parse(result.content[0].text)).toEqual({ id: "link-1" });
-  });
-
-  it("API 에러 시 에러 메시지를 반환한다 (message 프로퍼티)", async () => {
-    const server = createMockMcpServer();
-    const apiClient = createMockApiClient();
-    const config = createMockConfig();
-
-    apiClient.getLinkBySuffix.mockRejectedValue({ message: "Not found" });
-
-    registerGetLinkByUrl(server as any, apiClient as any, config);
-    const handler = extractToolHandler(server);
-
-    const result = (await handler({
-      url: "https://deep.limelink.org/missing",
-    })) as any;
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("Not found");
-  });
-
-  it("message 프로퍼티 없는 에러를 String()으로 포맷한다", async () => {
-    const server = createMockMcpServer();
-    const apiClient = createMockApiClient();
-    const config = createMockConfig();
-
-    apiClient.getLinkBySuffix.mockRejectedValue(42);
-
-    registerGetLinkByUrl(server as any, apiClient as any, config);
-    const handler = extractToolHandler(server);
-
-    const result = (await handler({
-      url: "https://deep.limelink.org/test-link",
-    })) as any;
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("42");
-  });
+      expect(result.content[0].text).toContain(`HTTP ${status}`);
+      expect(result.content[0].text).toContain(
+        Array.isArray(message) ? message[0] : message
+      );
+    }
+  );
 });

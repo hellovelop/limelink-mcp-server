@@ -15,10 +15,10 @@ describe("E2E: Tools", () => {
   });
 
   describe("도구 목록", () => {
-    it("3개의 도구가 등록되어 있다", async () => {
+    it("6개의 도구가 등록되어 있다", async () => {
       const { tools } = await server.client.listTools();
 
-      expect(tools).toHaveLength(3);
+      expect(tools).toHaveLength(6);
 
       const names = tools.map((t) => t.name);
       expect(names).toContain("create-link");
@@ -45,19 +45,23 @@ describe("E2E: Tools", () => {
     });
   });
 
-  describe("get-link-by-url 에러 케이스", () => {
-    it("limelink이 아닌 URL은 에러를 반환한다", async () => {
+  describe("get-link-by-url 입력 계약", () => {
+    it("URL만 필수이고 Project selector를 노출하지 않는다", async () => {
+      const { tools } = await server.client.listTools();
+      const tool = tools.find((candidate) => candidate.name === "get-link-by-url");
+      expect(tool?.inputSchema.required).toEqual(["url"]);
+      expect(tool?.inputSchema.properties).not.toHaveProperty("project");
+    });
+
+    it("HTTP URL을 tool input validation에서 거부한다", async () => {
       const result = await server.client.callTool({
         name: "get-link-by-url",
-        arguments: {
-          url: "https://example.com/test",
-        },
+        arguments: { url: "http://deep.limelink.org/campaign" },
       });
-
       expect(result.isError).toBe(true);
-      const text = (result.content as Array<{ type: string; text: string }>)[0]
-        .text;
-      expect(text).toContain("Could not extract suffix");
+      expect((result.content as Array<{ text: string }>)[0].text).toContain(
+        "URL must use HTTPS"
+      );
     });
   });
 });
